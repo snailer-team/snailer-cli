@@ -64,6 +64,7 @@ pub struct ToolResult {
     pub result_type: String,    // "tool_result" (고정값)
     pub content: String,        // 결과 내용
     pub is_error: Option<bool>, // 에러 여부 (true면 에러)
+    pub name: String,           // 도구 이름 (일부 모델 API에서 필수)
 }
 ```
 
@@ -93,235 +94,165 @@ impl ToolRegistry {
 
 ## 내장 도구 목록
 
-### 🔍 Discovery Tools (탐색 도구)
+이 문서는 **공개 레포** 기준의 개념 설명이며, 실제 구현은 private repo의 `src/tools.rs`가 권위 있는 소스입니다.
 
-#### 1. read_file
+### 🔍 Discovery Tools (탐색)
 
-**설명**: 파일 내용을 읽습니다. 선택적으로 라인 범위 지정 가능.
+#### read_file
 
-**파라미터**:
+파일 내용을 읽습니다. (선택적으로 라인 범위)
+
 ```json
-{
-  "path": "src/main.rs",     // 필수: 파일 경로
-  "start": 10,               // 선택: 시작 라인 (1-indexed)
-  "end": 50                  // 선택: 끝 라인 (포함)
-}
+{ "path": "src/main.rs", "start": 10, "end": 50 }
 ```
 
-**예시 응답**:
-```
-    10  fn main() {
-    11      println!("Hello");
-    12  }
+#### view_file
+
+파일 내용을 “보기 전용”으로 읽습니다. `str_replace`용 정확한 스니펫 복사에 유용합니다.
+
+```json
+{ "path": "src/main.rs", "start": 10, "end": 50 }
 ```
 
-**구현 위치**: `tool_read_file()`
+#### search_repo
+
+ripgrep으로 코드 검색합니다. (`.gitignore` 존중)
+
+```json
+{ "query": "async fn", "file_pattern": "*.rs" }
+```
+
+#### find_files
+
+파일명 패턴으로 파일을 찾습니다.
+
+```json
+{ "pattern": "*.toml" }
+```
+
+#### vscode_open_file (GUI-only)
+
+VS Code 같은 GUI 에디터가 연결된 환경에서 파일을 열도록 “요청”합니다. (daemon 클라이언트가 처리)
+
+```json
+{ "path": "src/main.rs", "selection": { "startLine": 10, "endLine": 50 } }
+```
 
 ---
 
-#### 2. search_repo
+### ✏️ Editing Tools (편집)
 
-**설명**: ripgrep으로 코드 검색 (.gitignore 존중)
+#### edit_file
 
-**파라미터**:
+`old_text`를 `new_text`로 교체합니다. (작은 변경에 안전/신뢰성 높음)
+
 ```json
 {
-  "query": "async fn",          // 필수: 검색 패턴 (regex 지원)
-  "file_pattern": "*.rs"        // 선택: 파일 패턴
-}
-```
-
-**예시 응답**:
-```
-src/main.rs:45:pub async fn run() -> Result<()> {
-src/agent.rs:120:async fn execute_tool_loop(&mut self) {
-```
-
-**구현 위치**: `tool_search_repo()`
-
----
-
-#### 3. find_files
-
-**설명**: 파일명 패턴으로 파일 찾기
-
-**파라미터**:
-```json
-{
-  "pattern": "*.toml"           // 필수: 파일 패턴
-}
-```
-
-**예시 응답**:
-```
-Cargo.toml
-packages/snailer-cli/Cargo.toml
-```
-
-**구현 위치**: `tool_find_files()`
-
----
-
-### ✏️ Editing Tools (편집 도구)
-
-#### 4. edit_file
-
-**설명**: 파일에서 old_text를 new_text로 교체 (간단하고 신뢰성 높음)
-
-**파라미터**:
-```json
-{
-  "path": "src/main.rs",
+  "file_path": "src/main.rs",
   "old_text": "println!(\"Hello\");",
   "new_text": "println!(\"Hello, World!\");"
 }
 ```
 
-**특징**:
-- 정확한 문자열 매칭 (공백, 들여쓰기 포함)
-- 한 번만 교체 (안전성)
-- 실패 시 명확한 에러 메시지
+#### str_replace
 
-**구현 위치**: `tool_edit_file()`
+파일에서 `old`의 **첫 번째** 등장만 `new`로 교체합니다. (`view_file`로 복사한 스니펫을 사용 권장)
 
----
-
-#### 5. write_file
-
-**설명**: 새 파일 생성 또는 기존 파일 덮어쓰기
-
-**파라미터**:
 ```json
-{
-  "path": "src/new_module.rs",
-  "content": "pub fn hello() { println!(\"Hello\"); }"
-}
+{ "path": "src/main.rs", "old": "foo()", "new": "bar()" }
 ```
 
-**주의**:
-- 기존 파일을 덮어쓰므로 주의 필요
-- AI가 신중하게 사용하도록 설명 필요
+#### write_file
 
-**구현 위치**: `tool_write_file()`
+새 파일 생성 또는 기존 파일 덮어쓰기입니다.
 
----
-
-#### 6. create_file_with_edits
-
-**설명**: 여러 블록을 조합하여 새 파일 생성 (복잡한 파일 생성용)
-
-**파라미터**:
 ```json
-{
-  "path": "src/complex.rs",
-  "edits": [
-    {
-      "type": "create",
-      "content": "// File header\n"
-    },
-    {
-      "type": "insert_after",
-      "marker": "// File header",
-      "content": "use std::fs;"
-    }
-  ]
-}
+{ "path": "src/new_module.rs", "content": "pub fn hello() {}" }
 ```
 
-**특징**:
-- 복잡한 파일 구조 생성에 유용
-- 여러 편집 작업을 원자적으로 수행
+#### delete_file
 
-**구현 위치**: `tool_create_file_with_edits()`
+파일을 삭제합니다.
 
----
-
-### 🗂️ File Management Tools
-
-#### 7. delete_file
-
-**설명**: 파일 삭제 (신중하게 사용)
-
-**파라미터**:
 ```json
-{
-  "path": "temp_file.txt"
-}
+{ "path": "temp_file.txt" }
 ```
-
-**안전 장치**:
-- 중요한 파일 삭제 시 AI에게 경고
-- 실수 방지를 위한 확인 로직
-
-**구현 위치**: `tool_delete_file()`
 
 ---
 
-#### 8. move_file
+### 🖥️ Command Execution Tools (명령 실행)
 
-**설명**: 파일 이동/이름 변경
+#### bash_run (recommended)
 
-**파라미터**:
+빌드/테스트/린트 같은 커맨드를 실행합니다. **전체 로그는 파일로 저장**하고, 응답에는 요약만 포함해 컨텍스트 폭발을 줄입니다.
+
 ```json
-{
-  "source": "old_name.rs",
-  "destination": "new_name.rs"
-}
+{ "cmd": ["cargo", "test"], "timeout_sec": 120 }
 ```
 
-**구현 위치**: `tool_move_file()`
+#### bash_log
 
----
+이전 `bash_run`의 전체 로그를 ID로 조회합니다. (가능하면 `tail`/`head`로 범위를 제한)
 
-### 📋 Directory Tools
-
-#### 9. list_directory
-
-**설명**: 디렉토리 내용 나열
-
-**파라미터**:
 ```json
-{
-  "path": "src/",              // 선택: 경로 (기본값: 프로젝트 루트)
-  "recursive": false           // 선택: 재귀적 탐색
-}
+{ "cmd_id": "bash_20250107_143022_a1b2c3d4", "stream": "stderr", "tail": 200 }
 ```
 
-**예시 응답**:
-```
-src/
-  main.rs
-  agent.rs
-  tools.rs
-  api.rs
-```
+#### bash_history
 
-**구현 위치**: `tool_list_directory()`
+최근 실행한 bash 커맨드 히스토리를 요약합니다.
 
----
-
-### 🐚 Shell Tools
-
-#### 10. shell_command
-
-**설명**: 셸 명령 실행 (신중하게 사용)
-
-**파라미터**:
 ```json
-{
-  "command": "cargo build --release",
-  "timeout": 60000             // 선택: 타임아웃 (ms)
-}
+{ "last_n": 10 }
 ```
 
-**보안 고려사항**:
-- 위험한 명령 필터링
-- 사용자 승인 필요 (향후 추가)
-- 타임아웃 설정
+#### run_cmd (deprecated)
 
-**구현 위치**: `tool_shell_command()`
+이전 방식의 커맨드 실행 도구입니다. 신규 작업에서는 `bash_run`을 사용하세요.
+
+```json
+{ "cmd": "npm test", "timeout_sec": 120, "detached": false }
+```
 
 ---
+
+### 🧠 Project Memory / Skills
+
+#### read_notes / write_notes
+
+프로젝트 루트의 `NOTES.md`를 통해 “지속 메모”를 읽고/씁니다.
+
+```json
+{ "section": "Architecture" }
+```
+
+```json
+{ "section": "Decisions", "content": "We chose X because Y.", "append": true }
+```
+
+#### use_skill
+
+사전 정의된 “스킬(워크플로우)”을 실행합니다.
+
+```json
+{ "skill_id": "skill-installer", "reason": "Need to install a curated skill", "inputs": { "user_request": "install skill X" } }
+```
+
+#### start_appgen_wizard
+
+요청이 짧거나 모호할 때, TUI로 간단한 다지선다 질문을 통해 요구사항을 명확히 합니다.
+
+```json
+{ "reason": "Need clarification", "flow_hint": "focus on auth and data model" }
+```
+
+#### disable_repair_guard
+
+Repair Guard가 정당한 작업을 막는 경우, 근거와 함께 강제로 비활성화합니다.
+
+```json
+{ "reason": "Need to edit files outside allowed set for this fix." }
+```
 
 ## 도구 실행 흐름
 
@@ -553,7 +484,7 @@ mod tests {
 1. **명확한 설명 작성**
 ```rust
 Tool {
-    name: "search_files".to_string(),
+    name: "search_repo".to_string(),
     description: "Search for files by name pattern. Use glob patterns like *.rs or Config*.json".to_string(),
     // ↑ AI가 언제 사용할지 명확히 알 수 있음
 }
@@ -589,10 +520,10 @@ fn tool_read_file(&self, input: &Value) -> Result<String> {
 
 4. **타임아웃 설정**
 ```rust
-fn tool_shell_command(&self, input: &Value) -> Result<String> {
-    let timeout = input["timeout"]
+fn tool_bash_run(&self, input: &Value) -> Result<String> {
+    let timeout_sec = input["timeout_sec"]
         .as_u64()
-        .unwrap_or(30000);  // ✅ 기본값 30초
+        .unwrap_or(120);  // ✅ 기본값 120초
 
     // 타임아웃 적용 로직
 }
@@ -631,21 +562,21 @@ Err(anyhow!("Failed to read file: permission denied"))
 3. **위험한 명령 필터링 없음**
 ```rust
 // ❌ Bad: 모든 명령 허용
-fn tool_shell_command(&self, input: &Value) -> Result<String> {
-    let command = input["command"].as_str()?;
-    Command::new("sh").arg("-c").arg(command).output()?;
+fn tool_run_cmd(&self, input: &Value) -> Result<String> {
+    let cmd = input["cmd"].as_str()?;
+    Command::new("sh").arg("-c").arg(cmd).output()?;
 }
 
 // ✅ Good: 위험한 명령 차단
-fn tool_shell_command(&self, input: &Value) -> Result<String> {
-    let command = input["command"].as_str()?;
+fn tool_run_cmd(&self, input: &Value) -> Result<String> {
+    let cmd = input["cmd"].as_str()?;
 
     // 위험한 명령 차단
-    if command.contains("rm -rf /") {
+    if cmd.contains("rm -rf /") {
         return Err(anyhow!("Dangerous command blocked"));
     }
 
-    Command::new("sh").arg("-c").arg(command).output()?;
+    Command::new("sh").arg("-c").arg(cmd).output()?;
 }
 ```
 
@@ -714,18 +645,18 @@ fn validate_path(&self, path: &str) -> Result<PathBuf> {
 ### 2. 명령 인젝션 방지
 
 ```rust
-fn tool_shell_command(&self, input: &Value) -> Result<String> {
-    let command = input["command"].as_str()?;
+fn tool_run_cmd(&self, input: &Value) -> Result<String> {
+    let cmd = input["cmd"].as_str()?;
 
     // 허용된 명령만 실행
     let allowed_commands = ["cargo", "npm", "git"];
-    let cmd = command.split_whitespace().next().unwrap_or("");
+    let bin = cmd.split_whitespace().next().unwrap_or("");
 
-    if !allowed_commands.contains(&cmd) {
-        return Err(anyhow!("Command not allowed: {}", cmd));
+    if !allowed_commands.contains(&bin) {
+        return Err(anyhow!("Command not allowed: {}", bin));
     }
 
-    Command::new("sh").arg("-c").arg(command).output()?;
+    Command::new("sh").arg("-c").arg(cmd).output()?;
 }
 ```
 

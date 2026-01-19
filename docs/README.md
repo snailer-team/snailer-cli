@@ -33,6 +33,16 @@
   - Generator → Reflector → Curator 사이클
   - 자기 학습 메커니즘
 
+### Project Memory (Updated)
+
+- **[Project Memory & Skills Quickstart](./KNOWLEDGE_BASE_QUICKSTART.md)**
+  - Skills (`snailer skills ...`)
+  - Persistent notes (`NOTES.md` via `read_notes` / `write_notes`)
+  - Experimental CodeWiki (`snailer wiki ...`)
+
+- **[Knowledge Base Implementation Plan (Archived)](./KNOWLEDGE_BASE_IMPLEMENTATION_PLAN.md)**
+  - Historical design draft; not implemented in current CLI
+
 ## 🚀 Quick Navigation
 
 ### For New Contributors

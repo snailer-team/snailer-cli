@@ -85,7 +85,7 @@ Snailer는 터미널에서 자연어 명령을 받아 코드 작성, 파일 수�
 검색 등을 자동으로 수행하는 AI 개발 도우미입니다.
 
 예시:
-$ snailer "모든 .rs 파일에서 TODO 주석 찾아줘"
+$ snailer --prompt "모든 .rs 파일에서 TODO 주석 찾아줘"
 ```
 
 **어디서 시작할까요?**
@@ -270,7 +270,7 @@ jobs:
 많은 Rust 초보자는 에러 처리에 `unwrap()`을 남발합니다:
 
 STEP 1: 문제 있는 코드 찾기
-$ snailer "모든 .rs 파일에서 unwrap() 사용 찾아줘"
+$ snailer --prompt "모든 .rs 파일에서 unwrap() 사용 찾아줘"
 
 🤖 Snailer:
 찾았습니다! 15개 파일에서 총 47개의 unwrap() 발견:
@@ -282,7 +282,7 @@ $ snailer "모든 .rs 파일에서 unwrap() 사용 찾아줘"
 ## 2. 리팩토링 시작
 
 STEP 2: 개별 파일 리팩토링
-$ snailer "src/main.rs에서 unwrap()을 Result<?> 패턴으로 바꿔줘"
+$ snailer --prompt "src/main.rs에서 unwrap()을 Result<?> 패턴으로 바꿔줘"
 
 🤖 Snailer:
 리팩토링 완료! 변경 사항:
@@ -399,7 +399,7 @@ export function activate(context: vscode.ExtensionContext) {
         cancellable: false
       }, async (progress) => {
         return new Promise((resolve, reject) => {
-          exec(`snailer "${prompt}"`, (error, stdout, stderr) => {
+          exec(`snailer --prompt "${prompt}"`, (error, stdout, stderr) => {
             if (error) {
               vscode.window.showErrorMessage(`Snailer 에러: ${stderr}`);
               reject(error);
@@ -673,7 +673,7 @@ docs/
 ````markdown
 ```bash
 # 주석은 # 사용
-snailer "명령어"
+snailer --prompt "명령어"
 ```
 
 ```rust

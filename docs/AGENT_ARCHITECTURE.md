@@ -98,33 +98,41 @@ impl ToolRegistry {
 ```
 
 **지원 도구**:
-- `shell`: 셸 명령 실행
 - `read_file`: 파일 읽기
+- `view_file`: 파일 보기(읽기 전용)
 - `write_file`: 파일 쓰기
-- `list_files`: 디렉토리 목록
-- `search_files`: 파일 내용 검색
-- `git_*`: Git 명령들
+- `edit_file`: 정확한 텍스트 교체
+- `str_replace`: 첫 번째 스니펫 교체
+- `search_repo`: ripgrep 검색
+- `find_files`: 파일명 패턴 검색
+- `bash_run`: 빌드/테스트 실행(요약 반환, 전체 로그는 파일 저장)
+- `bash_log`: `bash_run` 로그 조회
+- `read_notes` / `write_notes`: `NOTES.md` 기반 프로젝트 메모
+- `use_skill`: 스킬(워크플로우) 실행
 
 ---
 
 ## 실행 모드
 
-Snailer Agent는 3가지 실행 모드를 지원합니다:
+Snailer는 여러 실행 모드를 지원합니다:
 
-### 1. Simple Mode (단순 모드)
+### 1. Classic Mode (기본)
 
 ```rust
 pub async fn run_simple_mode(&mut self) -> Result<()>
 ```
 
 **특징**:
-- 도구 호출 없이 단순 질의응답만 수행
-- 빠른 응답이 필요한 경우 사용
-- 컨텍스트가 간단한 질문에 적합
+- 빠른 질의응답/계획/가벼운 작업에 적합
+- 필요 시 에이전트 모드로 전환 가능 (`--agent`)
+- `--prompt` 없이 실행하면 REPL(대화형)로 진입
 
 **사용 사례**:
 ```bash
 snailer --prompt "Rust에서 async/await의 원리 설명해줘"
+
+# REPL (interactive)
+snailer
 ```
 
 ### 2. Agent Mode (에이전트 모드)
@@ -168,7 +176,31 @@ pub async fn run_grpo_rollout(&mut self, group_size: usize) -> Result<()>
 
 **사용 사례**:
 ```bash
-snailer --grpo --group-size 4 --prompt "복잡한 리팩토링 작업"
+snailer --agent --grpo --group-size 4 --prompt "복잡한 리팩토링 작업"
+```
+
+### 4. MDAP Mode (SWE-bench 워크플로우)
+
+**특징**:
+- Massively Decomposed Agentic Processes
+- 에피소드 기반(분해/수정/검증) 워크플로우로 안정적인 수리 작업에 유리
+
+**사용 사례**:
+```bash
+snailer --mdap --prompt "Fix the failing tests"
+snailer --mdap-v3 --mdap-k 3 --auto-approve --prompt "Fix the failing tests"
+```
+
+### 5. Team Orchestrator Mode (멀티 에이전트)
+
+**특징**:
+- 역할(Explorer/Debugger/Tester 등) 기반 멀티 에이전트 실행
+- 컨텍스트/비용/진행 상황을 역할별로 분리해 대규모 작업에 유리
+
+**사용 사례**:
+```bash
+snailer --team --prompt "Implement feature X end-to-end"
+snailer --team --tui --prompt "Implement feature X end-to-end"
 ```
 
 ---
@@ -293,7 +325,7 @@ conversation_history: Vec<Value>
 [
   {
     "role": "user",
-    "content": "파일 목록을 보여줘"
+    "content": "src/main.rs 내용을 보여줘"
   },
   {
     "role": "assistant",
@@ -301,8 +333,8 @@ conversation_history: Vec<Value>
       {
         "type": "tool_use",
         "id": "toolu_123",
-        "name": "list_files",
-        "input": {"path": "."}
+        "name": "read_file",
+        "input": {"path": "src/main.rs", "start": 1, "end": 80}
       }
     ]
   },
@@ -312,7 +344,7 @@ conversation_history: Vec<Value>
       {
         "type": "tool_result",
         "tool_use_id": "toolu_123",
-        "content": "file1.rs\nfile2.rs"
+        "content": "1  fn main() {\n2    println!(\"Hello\");\n3  }\n..."
       }
     ]
   }

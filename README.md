@@ -44,11 +44,11 @@ Snailer is an **intelligent AI coding agent** that lives in your terminal, under
 - 💬 **Natural Language**: Just describe what you want in plain English
 
 ```bash
-# Example: Let Snailer refactor your code
-snailer "refactor the authentication module to use async/await"
+# One-shot mode (runs once and exits)
+snailer --prompt "refactor the authentication module to use async/await"
 
-# Example: Complex multi-step tasks
-snailer "find all TODO comments, create GitHub issues, and remove them from code"
+# Interactive mode (start REPL, then type prompts and slash-commands like /model, /team)
+snailer
 ```
 
 ---
@@ -78,22 +78,28 @@ Snailer uses **ACE (Agentic Context Engineering)** to improve over time:
 | Tool | Description |
 |------|-------------|
 | `read_file` | Read file contents with optional line ranges |
-| `write_file` | Create or overwrite files |
-| `edit_file` | Precise text replacement in files |
+| `view_file` | View file contents (read-only, line ranges) |
 | `search_repo` | Search code with ripgrep (respects .gitignore) |
 | `find_files` | Find files by name pattern |
-| `shell_command` | Execute shell commands with timeout |
-| `list_directory` | List directory contents |
+| `edit_file` | Precise text replacement in files |
+| `str_replace` | Replace the first occurrence of a snippet |
+| `write_file` | Create or overwrite files |
 | `delete_file` | Delete files safely |
-| `move_file` | Move or rename files |
+| `bash_run` | Run build/test/lint commands with summarized output |
+| `bash_log` | Fetch full logs for a previous `bash_run` by ID |
+| `read_notes` | Read persistent project notes (`NOTES.md`) |
+| `write_notes` | Write persistent project notes (`NOTES.md`) |
 
 [View all tools →](docs/TOOL_SYSTEM.md)
 
 ### 🎯 Execution Modes
 
-- **Simple Mode**: Quick Q&A without tool execution
-- **Agent Mode**: Full tool-based task execution (default)
-- **GRPO Mode**: Experimental multi-attempt optimization
+- **Classic**: Fast chat-first loop (default)
+- **Agent**: Tool-based execution (`--agent`)
+- **GRPO**: Multi-attempt rollout (`--grpo --group-size N`)
+- **MDAP**: SWE-bench optimized multi-episode workflows (`--mdap` / `--mdap-v3`)
+- **Team Orchestrator**: Multi-agent execution with role-specific models (`--team`)
+- **TUI**: Optional OpenCode-style sidebar for one-shot runs (`--tui`)
 
 ---
 
